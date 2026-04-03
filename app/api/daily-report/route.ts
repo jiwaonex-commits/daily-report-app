@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    message: "route.ts updated",
+    message: "daily-report api is alive",
     hasGasUrl: !!process.env.GAS_WEB_APP_URL,
   });
 }
@@ -11,29 +11,6 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
-    const {
-      reportDate,
-      mainAchievement,
-      insight,
-      nextAction,
-      totalHours,
-      items,
-    } = body;
-
-    if (!reportDate) {
-      return NextResponse.json(
-        { error: "日付は必須です。" },
-        { status: 400 }
-      );
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "明細は1行以上必要です。" },
-        { status: 400 }
-      );
-    }
 
     const gasUrl = process.env.GAS_WEB_APP_URL;
 
@@ -49,15 +26,7 @@ export async function POST(req: Request) {
       headers: {
         "Content-Type": "text/plain;charset=utf-8",
       },
-      body: JSON.stringify({
-        mode: "saveDailyReport",
-        reportDate,
-        mainAchievement,
-        insight,
-        nextAction,
-        totalHours,
-        items,
-      }),
+      body: JSON.stringify(body),
     });
 
     const rawText = await gasRes.text();
@@ -75,10 +44,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: parsed,
-    });
+    return NextResponse.json(parsed);
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "サーバーエラーが発生しました。" },
