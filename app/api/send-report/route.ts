@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "route.ts updated",
+    hasGasUrl: !!process.env.GAS_WEB_APP_URL,
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -54,24 +62,14 @@ export async function POST(req: Request) {
 
     const rawText = await gasRes.text();
 
-    let parsed: any = null;
+    let parsed: any;
     try {
       parsed = JSON.parse(rawText);
     } catch {
       return NextResponse.json(
         {
           error: "GASからJSON以外が返っています。",
-          raw: rawText.substring(0, 1000),
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!gasRes.ok) {
-      return NextResponse.json(
-        {
-          error: parsed?.error || "Apps Script 側でエラーが発生しました。",
-          raw: rawText.substring(0, 1000),
+          raw: rawText.slice(0, 500),
         },
         { status: 500 }
       );
