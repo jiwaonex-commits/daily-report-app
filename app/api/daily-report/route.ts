@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: "GASからJSON以外が返っています。",
-          raw: rawText.slice(0, 500),
+          raw: rawText.slice(0, 1000),
         },
         { status: 500 }
       );
@@ -79,7 +79,17 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: parsed?.error || "Apps Script 側でエラーが発生しました。",
-          raw: rawText.slice(0, 500),
+          raw: rawText.slice(0, 1000),
+        },
+        { status: 500 }
+      );
+    }
+
+    if (parsed?.success !== true) {
+      return NextResponse.json(
+        {
+          error: parsed?.error || "Apps Script 側で保存に失敗しました。",
+          gasResponse: parsed,
         },
         { status: 500 }
       );
