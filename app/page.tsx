@@ -1,302 +1,155 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { toPng } from "html-to-image";
-
-const PROJECTS = ["住宅", "ガス", "眼鏡", "フード", "会社", "外部", "個人"];
-const CATEGORIES = ["営業", "追客", "集客", "事務", "会議", "移動", "学習", "その他"];
+import { useMemo, useState } from "react";
 
 type ReportItem = {
-  project: string;
-  category: string;
-  task: string;
+  industryTag: string;
+  workType: string;
+  workDetail: string;
   hours: string;
-  outcomeText: string;
+  result: string;
   note: string;
 };
 
-type ReportData = {
-  date: string;
-  majorOutcome: string;
-  insight: string;
-  nextAction: string;
-  totalHours: string;
-  items: ReportItem[];
-};
+const createEmptyItem = (): ReportItem => ({
+  industryTag: "",
+  workType: "",
+  workDetail: "",
+  hours: "",
+  result: "",
+  note: "",
+});
 
-export default function Home() {
-  const today = new Date().toISOString().slice(0, 10);
+export default function Page() {
+  const [reportDate, setReportDate] = useState("");
+  const [mainAchievement, setMainAchievement] = useState("");
+  const [insight, setInsight] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [items, setItems] = useState<ReportItem[]>([createEmptyItem()]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [report, setReport] = useState<ReportData>({
-    date: today,
-    majorOutcome: "",
-    insight: "",
-    nextAction: "",
-    totalHours: "",
-    items: [
-      {
-        project: "住宅",
-        category: "営業",
-        task: "",
-        hours: "",
-        outcomeText: "",
-        note: "",
-      },
-    ],
-  });
+  // 合計時間
+  const totalHours = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const num = parseFloat(item.hours || "0");
+      return sum + (isNaN(num) ? 0 : num);
+    }, 0);
+  }, [items]);
 
-  const [logs, setLogs] = useState<ReportData[]>([]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("daily-report-logs");
-    if (saved) setLogs(JSON.parse(saved));
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("daily-report-logs", JSON.stringify(logs));
-  }, [logs]);
-
-  const item = report.items[0];
-
-  const handleSave = () => {
-    if (!item.task.trim()) {
-      alert("業務内容を書いて");
-      return;
-    }
-
-    setLogs([report, ...logs]);
-    alert("保存しました");
+  // 明細更新
+  const updateItem = (index: number, key: keyof ReportItem, value: string) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, [key]: value } : item
+      )
+    );
   };
 
-  const handleSend = async () => {
-    if (!item.task.trim()) {
-      alert("業務内容を書いて");
+  // 明細追加
+  const addItem = () => {
+    setItems((prev) => [...prev, createEmptyItem()]);
+  };
+
+  // 明細削除
+  const removeItem = (index: number) => {
+    setItems((prev) => {
+      if (prev.length === 1) return [createEmptyItem()];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // 送信
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!reportDate) {
+      setMessage("日付を入力してください");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const res = await fetch("/api/send-report", {
+      const res = await fetch("/api/daily-report", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          report,
+          reportDate,
+          mainAchievement,
+          insight,
+          nextAction,
+          totalHours,
+          items,
         }),
       });
 
-      const result = await res.json();
-      console.log(result);
-      alert(JSON.stringify(result));
-    } catch (error) {
-      console.error(error);
-      alert("送信エラーが出た");
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "保存失敗");
+
+      setMessage("保存しました");
+      setItems([createEmptyItem()]);
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleImage = async () => {
-    const node = document.getElementById("capture");
-    if (!node) return;
-
-    const dataUrl = await toPng(node);
-    const link = document.createElement("a");
-    link.download = "report.png";
-    link.href = dataUrl;
-    link.click();
-  };
-
   return (
-    <div style={{ padding: 30, maxWidth: 900, margin: "0 auto" }}>
-      <h1>日報アプリ</h1>
+    <main className="max-w-4xl mx-auto p-6 space-y-6">
+      <h1 className="text-2xl font-bold">日報入力</h1>
 
-      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-        <label>
-          日付
-          <br />
-          <input
-            type="date"
-            value={report.date}
-            onChange={(e) => setReport({ ...report, date: e.target.value })}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-        <label>
-          主要成果
-          <br />
-          <input
-            value={report.majorOutcome}
-            onChange={(e) => setReport({ ...report, majorOutcome: e.target.value })}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+        {/* ヘッダ */}
+        <div className="border p-4 rounded space-y-3">
+          <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="w-full border p-2" />
+          <textarea placeholder="主要成果" value={mainAchievement} onChange={(e) => setMainAchievement(e.target.value)} className="w-full border p-2" />
+          <textarea placeholder="気づき" value={insight} onChange={(e) => setInsight(e.target.value)} className="w-full border p-2" />
+          <textarea placeholder="次アクション" value={nextAction} onChange={(e) => setNextAction(e.target.value)} className="w-full border p-2" />
+          <input value={totalHours} readOnly className="w-full border p-2 bg-gray-100" />
+        </div>
 
-        <label>
-          気づき
-          <br />
-          <input
-            value={report.insight}
-            onChange={(e) => setReport({ ...report, insight: e.target.value })}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+        {/* 明細 */}
+        <div className="space-y-4">
+          <button type="button" onClick={addItem} className="bg-blue-600 text-white px-4 py-2 rounded">
+            ＋追加
+          </button>
 
-        <label>
-          次アクション
-          <br />
-          <input
-            value={report.nextAction}
-            onChange={(e) => setReport({ ...report, nextAction: e.target.value })}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+          {items.map((item, index) => (
+            <div key={index} className="border p-4 rounded space-y-3 bg-gray-50">
 
-        <label>
-          合計時間
-          <br />
-          <input
-            value={report.totalHours}
-            onChange={(e) => setReport({ ...report, totalHours: e.target.value })}
-            placeholder="例: 8"
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+              <button type="button" onClick={() => removeItem(index)} className="text-red-500">
+                削除
+              </button>
 
-        <hr />
+              <input placeholder="業種タグ" value={item.industryTag} onChange={(e) => updateItem(index, "industryTag", e.target.value)} className="w-full border p-2" />
 
-        <label>
-          業種タグ
-          <br />
-          <select
-            value={item.project}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, project: e.target.value }],
-              })
-            }
-            style={{ width: "100%", padding: 8 }}
-          >
-            {PROJECTS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
+              <input placeholder="業務種別" value={item.workType} onChange={(e) => updateItem(index, "workType", e.target.value)} className="w-full border p-2" />
 
-        <label>
-          業務種別
-          <br />
-          <select
-            value={item.category}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, category: e.target.value }],
-              })
-            }
-            style={{ width: "100%", padding: 8 }}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
+              <textarea placeholder="業務内容" value={item.workDetail} onChange={(e) => updateItem(index, "workDetail", e.target.value)} className="w-full border p-2" rows={3} />
 
-        <label>
-          業務内容
-          <br />
-          <input
-            value={item.task}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, task: e.target.value }],
-              })
-            }
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+              <input type="number" placeholder="時間（例：1.5）" value={item.hours} onChange={(e) => updateItem(index, "hours", e.target.value)} className="w-full border p-2" />
 
-        <label>
-          時間
-          <br />
-          <input
-            value={item.hours}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, hours: e.target.value }],
-              })
-            }
-            placeholder="例: 2"
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+              <textarea placeholder="成果" value={item.result} onChange={(e) => updateItem(index, "result", e.target.value)} className="w-full border p-2" rows={3} />
 
-        <label>
-          成果
-          <br />
-          <input
-            value={item.outcomeText}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, outcomeText: e.target.value }],
-              })
-            }
-            style={{ width: "100%", padding: 8 }}
-          />
-        </label>
+              <textarea placeholder="備考" value={item.note} onChange={(e) => updateItem(index, "note", e.target.value)} className="w-full border p-2" rows={3} />
 
-        <label>
-          備考
-          <br />
-          <textarea
-            value={item.note}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                items: [{ ...item, note: e.target.value }],
-              })
-            }
-            style={{ width: "100%", height: 80, padding: 8 }}
-          />
-        </label>
-      </div>
+            </div>
+          ))}
+        </div>
 
-      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={handleSave}>保存</button>
-        <button onClick={handleSend}>Sheets送信</button>
-        <button onClick={handleImage}>画像保存</button>
-      </div>
+        <button type="submit" disabled={loading} className="bg-green-600 text-white px-6 py-3 rounded">
+          {loading ? "保存中..." : "保存"}
+        </button>
 
-      <div
-        id="capture"
-        style={{
-          marginTop: 30,
-          padding: 20,
-          border: "1px solid #ccc",
-          borderRadius: 8,
-        }}
-      >
-        <h2>入力内容プレビュー</h2>
-        <p>日付: {report.date}</p>
-        <p>主要成果: {report.majorOutcome}</p>
-        <p>気づき: {report.insight}</p>
-        <p>次アクション: {report.nextAction}</p>
-        <p>合計時間: {report.totalHours}</p>
-        <hr />
-        <p>業種: {item.project}</p>
-        <p>業務種別: {item.category}</p>
-        <p>業務内容: {item.task}</p>
-        <p>時間: {item.hours}</p>
-        <p>成果: {item.outcomeText}</p>
-        <p>備考: {item.note}</p>
-      </div>
-    </div>
+        {message && <p>{message}</p>}
+      </form>
+    </main>
   );
 }
